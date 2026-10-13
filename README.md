@@ -47,6 +47,9 @@ mcp-guard scan ./my-mcp-server --format sarif --output results.sarif
 # Fail CI if HIGH or CRITICAL findings
 mcp-guard scan ./my-mcp-server --fail-on high
 
+# Audit every MCP server installed as an npm dependency under node_modules
+mcp-guard scan ./my-project --npm --format json
+
 # Enforce security deny rules from a YAML config
 mcp-guard scan ./my-mcp-server --config policy.yaml --deny
 
@@ -66,6 +69,40 @@ mcp-guard verify @scope/mcp-server@1.2.0 --policy strict --format json
 # Show server info without scanning
 mcp-guard info ./my-mcp-server
 ```
+
+## npm package scanning
+
+MCP servers are commonly published to npm (`@modelcontextprotocol/server-*`,
+`@mcp/*`, `mcp-*`) and ship an `mcp.json` (or another known config name) next to
+their code. Point `scan` at a project root with `--npm` to audit the MCP surface a
+project pulls in:
+
+```bash
+# Report the MCP-related dependencies in package.json and scan every MCP
+# config found under node_modules/ in JSON
+mcp-guard scan ./my-project --npm --format json
+
+# Emit a multi-run SARIF document for GitHub Code Scanning
+mcp-guard scan ./my-project --npm --format sarif --output results.sarif
+
+# Fail CI if any installed server trips a deny rule
+mcp-guard scan ./my-project --npm --deny-server "untrusted-*" --deny
+```
+
+With `--npm`, the path is treated as a **project root** rather than a single
+manifest:
+
+- MCP-related dependencies are listed from `package.json`
+  (`dependencies`, `devDependencies`, `optionalDependencies`).
+- Every `mcp.json` / `mcp.config.json` / `.mcp.json` / `server.json` under
+  `node_modules/` is scanned; the owning npm package is attributed to each result.
+- A manifest that cannot be parsed is **skipped and reported, not fatal**.
+- `--deny`, `--fail-on`, `--config` and the JSON / SARIF / CLI output formats all
+  apply to the aggregated result set.
+
+Discovery is filesystem-only: it never runs `npm` or `node`, never executes a
+discovered manifest, and makes no network call (the same offline posture as the
+supply-chain verifier).
 
 ## Supported config formats
 
